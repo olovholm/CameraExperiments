@@ -8,14 +8,24 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject var controller = CameraViewController()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack(alignment: .top) {
+            CameraView(controller: controller)
+            VStack {
+                Spacer()
+                Text("Faces detected: \(controller.faceCount)")
+                    .padding()
+                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                    .padding()
+                
+            }
+
         }
-        .padding()
+        .edgesIgnoringSafeArea(.all)
     }
 }
 
