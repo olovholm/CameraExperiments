@@ -8,12 +8,16 @@
 import AVKit
 import AVFoundation
 import Vision
+import OSLog
+
 
 class CameraViewController: UIViewController, AVCaptureVideoDataOutputSampleBufferDelegate, ObservableObject {
     @Published var faceCount: Int = 0
+    @Published var faceRects: [CGRect] = []
     private var isUsingFrontCamera = false
 
     var faceLayers: [CAShapeLayer] = []
+    
     private var lastProcessTime = Date()
     private let session = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -43,7 +47,7 @@ class CameraViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         if session.canAddOutput(videoOutput) {
             videoOutput.setSampleBufferDelegate(self, queue: queue)
             session.addOutput(videoOutput)
-            print("Input outputAdded")
+            os_log(.info, "Input outputAdded")
         }
         
         previewLayer = AVCaptureVideoPreviewLayer(session: session)
@@ -55,7 +59,7 @@ class CameraViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         
         DispatchQueue.global(qos: .userInitiated).async {
             self.session.startRunning()
-            print("Camera session started: \(self.session.isRunning)")
+            os_log(.debug, "Camera session started: \(self.session.isRunning)")
 
         }
         
@@ -74,15 +78,29 @@ class CameraViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         }
         lastProcessTime = now
         
-        print("Will process incoming frame")
+        os_log(.debug, "Will process incoming frame")
+        
         let request = VNDetectFaceRectanglesRequest { request, error in
             if let results = request.results as? [VNFaceObservation] {
                 let detected = results.count
-                self.faceCount = detected
-                print("Detected \(detected) face(s)")
+                DispatchQueue.main.async {
+                    self.faceRects.removeAll()
+                }
+                for result in results {
+                    os_log(.debug, "Face at %@", result.boundingBox.debugDescription)
+                    DispatchQueue.main.async {
+                        self.faceRects.append(result.boundingBox)
+                    }
+                }
+                os_log(.debug, "Detected %d face(s)", detected)
+                
+                DispatchQueue.main.async {
+                    self.faceCount = detected
+                }
+                
             }
             if(error != nil) {
-                print("Error \(String(describing: error))")
+                os_log(.error, "Error occurred while processing face detection request: %@", String(describing: error))
             }
         }
         
@@ -90,6 +108,10 @@ class CameraViewController: UIViewController, AVCaptureVideoDataOutputSampleBuff
         try? handler.perform([request])
         
 
+    }
+    
+    func convertFaceRect(_ boundingBox: CGRect) -> CGRect {
+        return previewLayer.layerRectConverted(fromMetadataOutputRect: boundingBox)
     }
     
 }
